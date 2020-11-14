@@ -26,7 +26,7 @@ This project implement the functions of matlab equivalent [face detection/recogn
 3. Prepare face data, interact with `prepare_getFaces.m` on the pc, then execute `prepare_faceDatabase.m` to save database features, and finally run `camera_faceRec.m` <br>
 
 # bluetooth control
-[bluetooth](images/BLE.jpg)<br>
+![bluetooth](images/BLE.jpg)<br>
 
 *Refer to [here](https://github.com/cuixing158/jetson_faceTrack_pytorch/blob/main/images/jetsonServo.jpg ) for the hardware connection diagram*<br>
 
