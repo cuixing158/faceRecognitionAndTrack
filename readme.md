@@ -1,6 +1,5 @@
 # Overview
 This project implement the functions of matlab equivalent [face detection/recognition](https://github.com/cuixing158/jetson_faceTrack_pytorch )+tracking+HC08 Bluetooth module transmitting/receiving signal+voice broadcast, etc. The code implementation is relatively simple, condensed arduino control program+matlab algorithm design, and has a strong understanding.<br>
-实现了matlab等价的[人脸检测/识别](https://github.com/cuixing158/jetson_faceTrack_pytorch )+追踪+HC08蓝牙模块发射/接收信号+语音播报等功能，代码实现较为简洁，浓缩arduino控制程序+matlab算法设计，理解性强。
 
 # Hardware and Software
 - [usb camera](https://ww2.mathworks.cn/matlabcentral/fileexchange/45182-matlab-support-package-for-usb-webcams?s_tid=srchtitle )
@@ -8,7 +7,7 @@ This project implement the functions of matlab equivalent [face detection/recogn
 - [arduino](https://www.arduino.cc/ )
 - [arduino support package](https://ww2.mathworks.cn/matlabcentral/fileexchange/47522-matlab-support-package-for-arduino-hardware?s_tid=srchtitle )
 - blueTooth HC08
-- >=matlab2020b
+- matlab2020b+
 - [arduino support package](https://ww2.mathworks.cn/matlabcentral/fileexchange/47522-matlab-support-package-for-arduino-hardware?s_tid=srchtitle )
 
 # Advantages
