@@ -1,4 +1,4 @@
-function prepare_getFaces(webcamName,yourName)
+function prepare_getFaces(webcamName,cameraResolution,yourName,scalar)
 % pc上在线获取并保存人脸图像，空格键保存，esc键或q键退出
 %
 % author:cuixingxing
@@ -6,16 +6,17 @@ function prepare_getFaces(webcamName,yourName)
 %
 arguments
     webcamName (1,1) string = "LRCP USB2.0 500W" % camera name
-    yourName (1,1) string = "cuixingxing" % face name
+    cameraResolution string = '1280x800'
+    yourName (1,1) string = "zhangsan" % face name
+    scalar (1,1) {mustBeNumeric,mustBeReal,mustBePositive} = 0.25 %图像缩放系数,small value speed fast detect
 end
 
 %%
 addpath('./mtcnn')
 facedetector = mtcnn.Detector("MinSize", 15, "MaxSize", 70,'UseGPU',true);
-scalar= 0.25; %图像缩放系数,small value speed fast detect
 
 cap = webcam(webcamName);
-cap.Resolution = '1280x800';
+cap.Resolution = cameraResolution;
 frame = snapshot(cap);
 imshow(frame)
 set(gcf,'CurrentCharacter','@'); % set to a dummy character

@@ -1,7 +1,7 @@
-function camera_faceRec(arduinoObj,BLEsserial,audioFile,faceOnnxFile,...
+function camera_faceRec(arduinoObj,BLEsserial,audioFolder,faceOnnxFile,...
     networkInput,faceBankFile,cameraName,cameraResolution,...
     servo1Port,servo2Port,...
-    rangeHcam,rangeVcam,rangeHservo,rangeVservo,scalar,useFaceRec)
+    rangeHcam,rangeVcam,rangeHservo,rangeVservo,scalar,options)
 % 功能：云台人脸检测识别跟踪+HC08蓝牙模块发射/接收控制信号+语音播报
 %
 % algorithm:MTCNN+ArcFace(mobilenet backbone)
@@ -15,7 +15,7 @@ function camera_faceRec(arduinoObj,BLEsserial,audioFile,faceOnnxFile,...
 arguments
     arduinoObj (1,1)  arduino = arduino("COM4","Mega2560","Libraries",{'Serial','Servo'}) % usb有限连接，Serial蓝牙模块，Servo舵机模块
     BLEsserial (1,1)  = device(arduinoObj,'SerialPort',3,'BaudRate', 9600) %  TxPin: 'D14' RxPin: 'D15'
-    audioFile  {mustBeFile} = '../dataSets/faceDetect.m4a' % audio file
+    audioFolder  {mustBeFolder} = '../dataSets' % audio files
     faceOnnxFile {mustBeFile} = '../models/faceRecogPth/model_mobilefacenet.onnx' % face recognition model file
     networkInput (1,2) {mustBeNumeric} = [112,112]
     faceBankFile {mustBeFile} = "../dataSets/facebank/facebank.mat"
@@ -28,26 +28,34 @@ arguments
     rangeHservo (1,1) {mustBePositive} = 180 % 舵机水平方向范围（单位：度）
     rangeVservo (1,1) {mustBePositive} = 180 % 舵机竖直方向范围（单位：度）
     scalar (1,1) double {mustBePositive} = 0.5 %图像缩放系数,系数越小，越有利于加快速度，但会漏检
-    useFaceRec (1,1) logical = true % 是否进行人脸识别
+    options.useFaceRec (1,1) string {mustBeMember(options.useFaceRec,["MobilenetFace","SoftMaxFace","ArcFace","None"])} = "ArcFace" % Name-Value pair
 end
 
 %% import all files
 addpath('./mtcnn') 
 addpath('./utils') 
 
-[y,Fs] = audioread(audioFile);
-player = audioplayer(y,Fs);
+% audioFiles = dir(fullfile(audioFolder,'*.m4a'));
+[y1,Fs1] = audioread(fullfile(audioFolder,'faceDetect.m4a'));
+player = audioplayer(y1,Fs1);
 
 % import Arc faceRecognition model
-isRecog = useFaceRec;
-faceRecParams = importONNXFunction(faceOnnxFile,'faceRecFcn');
+faceRecModel = options.useFaceRec;
+if strcmpi(faceRecModel,"MobilenetFace")
+    faceRecParams = importONNXFunction(faceOnnxFile,'faceRecFcn');
+elseif strcmpi(faceRecModel,"SoftMaxFace")
+    load('../models/faceRecogPth/mobilenetv2_softmax.mat','net');
+elseif  strcmpi(faceRecModel,"ArcFace")
+    load('../models/faceRecogPth/mobilenetv2_arcface.mat','net');
+end
+
 predictName = "unknow";
 predictScore = -1;
 load(faceBankFile,'st') % 人脸数据库特征，每个人对应1*512特征
-if isRecog && all(isfield(st,{'person','feature'}))
+if ~strcmpi(faceRecModel,"None") && all(isfield(st,{'person','feature'}))
     fprintf("The face database has person:"+join(repmat("%s",1,length(st.person)))+"\n",st.person{:});
 else
-    isRecog = false;
+    faceRecModel = false;
     warning("The face database have no person,please run prepare_getFaces.m and prepare_faceDatabase.m respectively! or 'useFaceRec' is set to false")
 end
 
@@ -114,7 +122,7 @@ while(videoObj.isOpen())
         landmark = landmarks(ind,:,:)./scalar;
         
         % 人脸识别
-        if isRecog
+        if ~strcmpi(faceRecModel,"None")
             xcenter = bbox(1)+bbox(3)/2;
             ycenter = bbox(2)+bbox(4)/2;
             height = bbox(4);
@@ -126,12 +134,18 @@ while(videoObj.isOpen())
             h = height;
             faceImg = imcrop(frame,[x,y,w,h]);
             if canUseGPU()
-                faceImg = gpuArray(preprocess(faceImg,networkInput)); % n*c*h*w，1*3*112*112, RGB, [0,1]输入
-                outFeature = faceRecFcn(faceImg,faceRecParams,...
-                    'Training',false,...
-                    'InputDataPermutation','none',...
-                    'OutputDataPermutation','none');
-                [predictName,predictScore] = classifyFace(outFeature,st);
+                if strcmpi(faceRecModel,"MobilenetFace") % onnx model
+                    faceImg = gpuArray(preprocess(faceImg,networkInput)); % n*c*h*w，1*3*112*112, RGB, [0,1]输入
+                    outFeature = faceRecFcn(faceImg,faceRecParams,...
+                        'Training',false,...
+                        'InputDataPermutation','none',...
+                        'OutputDataPermutation','none');
+                    [predictName,predictScore] = classifyFace(outFeature,st);
+                elseif strcmpi(faceRecModel,"SoftMaxFace") || strcmpi(faceRecModel,"ArcFace") % matlab model
+                    faceImg = gpuArray(imresize(faceImg,networkInput));
+                    [predictName,predictScore] = classify(net,faceImg);
+                    predictScore = max(predictScore);
+                end
             end
         end
         
@@ -139,14 +153,16 @@ while(videoObj.isOpen())
         write(BLEsserial,"Name:"+string(predictName)+",Score:"+string(predictScore)+"  ");
         
         % 语音播报
-        play(player); % Play without blocking，无阻塞方式播报
+        if strncmp(string(predictName),"zhangsan",7)
+            play(player); % Play without blocking，无阻塞方式播报
+        end
         
         %绘图
         RGB = insertObjectAnnotation(frame, "rectangle", bbox, score, "LineWidth", 2);
         RGB = insertMarker(RGB,squeeze(landmark),"square",...
             "Color","green");
         display = sprintf("FPS:%.2f,%s,score:%.2f",numFrame/toc(t1),predictName,predictScore);
-        RGB = insertText(RGB,[10,20],display);
+        RGB = insertText(RGB,[10,20],display,'FontSize',30);
         step(videoObj,RGB);
         
         %% 调整角度，假设相机无畸变
